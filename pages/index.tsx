@@ -1,124 +1,67 @@
-import React, { useCallback, useState } from "react"
+import React, { useCallback, useState, useEffect, useRef } from "react"
 import Head from "next/head"
 import Link from "next/link"
 import { useCredentialsCookie } from "@/context/credentials-context"
 import { useToast } from "@/hooks/use-toast"
-import { Bot, Loader2, Send, UploadCloud, User } from "lucide-react"
-import { useDropzone } from "react-dropzone"
+import { Bot, Loader2, Send, CheckCircle, User } from "lucide-react"
 
 import { siteConfig } from "@/config/site"
 import { cn } from "@/lib/utils"
 import { Layout } from "@/components/layout"
 import { Button } from "@/components/ui/button"
 
-const DEFAULT_QUESTION = "what is this about?"
+const DEFAULT_QUESTION = "O čem jsou následující soubory?"
 const INITIAL_MESSAGE = {
   from: "bot",
   content:
-    "You can think me as your knowledge base, once you uploaded a book, the knowledge will be persisted in the database. You can come back at any time to ask questions about them, across multiple books.",
+    "Můžete mě považovat za svou znalostní základnu, jakmile nahrajete soubor, znalosti budou uloženy v databázi. Můžete se kdykoli vrátit a pokládat otázky o nich napříč více soubory.",
 }
-const DEFAULT_GITHUB_URL = "https://github.com/fraserxu/book-gpt/tree/main"
 
 export default function IndexPage() {
-  const [files, setFiles] = useState(null)
+  const [documents, setDocuments] = useState([])
+  const [selectedDocuments, setSelectedDocuments] = useState([])
   const [question, setQuestion] = useState(DEFAULT_QUESTION)
-  const [isUploading, setIsUploading] = useState(false)
   const [isAsking, setIsAsking] = useState(false)
   const [chatHistory, setChatHistory] = useState([])
   const { cookieValue } = useCredentialsCookie()
-  const [githubUrl, setGithubUrl] = useState("")
+  const [selectAll, setSelectAll] = useState(false)
 
+  //hooks definition
+  const chatContainerRef = useRef(null)
   const { toast } = useToast()
 
-  const handleGithubUrlChange = (e) => {
-    setGithubUrl(e.target.value)
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [chatHistory]);
+
+  useEffect(() => {
+    fetchDocuments();
+  }, []);
+
+  const fetchDocuments = async () => {
+    try {
+      const response = await fetch("/api/documents");
+      const data = await response.json();
+      console.log("API response data:", data);
+      setDocuments(data);
+    } catch (error) {
+      console.error("Error fetching documents:", error);
+    }
+  };
+
+  const handleDocumentToggle = (document) => {
+    if (selectedDocuments.includes(document)) {
+      setSelectedDocuments(selectedDocuments.filter((doc) => doc !== document))
+    } else {
+      setSelectedDocuments([...selectedDocuments, document])
+    }
   }
+
   const handleQueryChange = (e) => {
     setQuestion(e.target.value)
   }
-
-  const onDrop = useCallback((acceptedFiles) => {
-    setFiles(acceptedFiles)
-  }, [])
-
-  const handleUpload = useCallback(async () => {
-    const formData = new FormData()
-    formData.append("openai-api-key", cookieValue.openaiApiKey)
-    formData.append("pinecone-api-key", cookieValue.pineconeApiKey)
-    formData.append("pinecone-environment", cookieValue.pineconeEnvironment)
-    formData.append("pinecone-index", cookieValue.pineconeIndex)
-    Array.from(files).forEach((file: File) => {
-      formData.append(file.name, file)
-    })
-
-    setIsUploading(true)
-    try {
-      const response = await fetch("/api/ingest", {
-        method: "post",
-        body: formData,
-      })
-      const result = await response.json()
-      if (result.error) {
-        toast({
-          title: "Something went wrong.",
-          description: result.error,
-        })
-      } else {
-        toast({
-          title: "Upload success.",
-        })
-      }
-
-      setIsUploading(false)
-    } catch (e) {
-      toast({
-        title: "Something went wrong.",
-      })
-      setIsUploading(false)
-    }
-  }, [files, cookieValue, toast])
-
-  const handleGithubUpload = useCallback(async () => {
-    setIsUploading(true)
-    try {
-      const response = await fetch("/api/github", {
-        body: JSON.stringify({
-          credentials: cookieValue,
-          githubUrl,
-        }),
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-      })
-      const result = await response.json()
-      if (result.error) {
-        toast({
-          title: "Something went wrong.",
-          description: result.error,
-        })
-      } else {
-        toast({
-          title: "Upload success.",
-        })
-      }
-
-      setIsUploading(false)
-    } catch (e) {
-      toast({
-        title: "Something went wrong.",
-      })
-      setIsUploading(false)
-    }
-  }, [githubUrl, cookieValue, toast])
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      "application/pdf": [".pdf"],
-      "text/plain": [".txt", ".md"],
-    },
-  })
 
   const handleSubmit = useCallback(async () => {
     setIsAsking(true)
@@ -139,6 +82,7 @@ export default function IndexPage() {
           prev += curr.content
           return prev
         }, ""),
+        selectedDocuments, // Added this line to include the selected documents in the request body
       }),
       method: "POST",
       headers: {
@@ -164,7 +108,7 @@ export default function IndexPage() {
         description: answer.error,
       })
     }
-  }, [question, chatHistory, cookieValue, toast])
+  }, [question, chatHistory, cookieValue, toast, selectedDocuments]) // Add selectedDocuments to the dependency array
 
   const handleKeyDown = useCallback(
     async (event) => {
@@ -174,6 +118,45 @@ export default function IndexPage() {
     },
     [handleSubmit]
   )
+
+  const handleSelectAll = () => {
+    if (selectAll) {
+      setSelectedDocuments([]);
+    } else {
+      setSelectedDocuments(documents);
+    }
+    setSelectAll(!selectAll);
+  };
+
+  const handleVectorize = useCallback(async () => {
+    try {
+      const response = await fetch("/api/create-vectorstore", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          credentials: cookieValue,
+          selectedDocuments }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Vectorization complete.",
+          description: "Selected documents have been vectorized.",
+        });
+      } else {
+        const error = await response.json();
+        throw new Error(error.error || "Unknown error.");
+      }
+    } catch (error) {
+      console.error("Error vectorizing documents:", error);
+      toast({
+        title: "Something went wrong.",
+        description: error.message || "Unknown error.",
+      });
+    }
+  }, [selectedDocuments, toast]);
 
   return (
     <Layout>
@@ -186,113 +169,66 @@ export default function IndexPage() {
       <section className="container flex flex-col justify-items-stretch gap-6 pt-6 pb-8 sm:flex-row md:py-10">
         <div className="min-w-1/5 flex flex-col items-start gap-2">
           <h2 className="mt-10 scroll-m-20 pb-2 text-2xl font-semibold tracking-tight transition-colors first:mt-0">
-            Upload one or multiple books
+            Dokumenty
           </h2>
-          <div
-            className="min-w-full rounded-md border border-slate-200 p-0 dark:border-slate-700"
-            {...getRootProps()}
-          >
-            <div className="flex min-h-[150px] cursor-pointer items-center justify-center p-10">
-              <input {...getInputProps()} />
-
-              {files ? (
-                <ul>
-                  {files.map((file) => (
-                    <li key={file.name}>* {file.name}</li>
-                  ))}
-                </ul>
-              ) : (
-                <>
-                  {isDragActive ? (
-                    <p>Drop the files here ...</p>
-                  ) : (
-                    <p>
-                      Drag and drop files(.pdf, .txt, .md) here, or click to
-                      select files
-                    </p>
-                  )}
-                </>
-              )}
-            </div>
+          <div className="min-w-full rounded-md border border-slate-200 p-0 dark:border-slate-700">
+            <ul className="p-4">
+              {Array.isArray(documents) &&
+                documents.map((document, index) => (
+                  <li key={index}>
+                  <input
+                    type="checkbox"
+                    checked={selectedDocuments.includes(document)}
+                    onChange={() => handleDocumentToggle(document)}
+                  />
+                  <span className="ml-2">{document.filename}</span>
+                </li>
+              ))}
+            </ul>
           </div>
 
-          <div className="self-start">
-            <Button
-              disabled={
-                !files ||
-                isUploading ||
-                !cookieValue.openaiApiKey ||
-                !cookieValue.pineconeEnvironment ||
-                !cookieValue.pineconeIndex ||
-                !cookieValue.pineconeApiKey
-              }
-              className="mt-2"
-              onClick={handleUpload}
-            >
-              {!isUploading ? (
-                <UploadCloud className="mr-2 h-4 w-4" />
-              ) : (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
-              Upload
+          <div className="flex items-center">
+            <Button className="mr-2"
+              onClick={handleSelectAll}>
+              {selectAll ? "Deselect All" : "Select All"}
             </Button>
-          </div>
-
-          <div className="my-2 min-w-full py-4 sm:mb-0">
-            <h2 className="mt-10 scroll-m-20 pb-2 text-2xl font-semibold tracking-tight transition-colors first:mt-0">
-              Or provide a url to a Github docs folder
-            </h2>
-            <div className="my-2 w-full">
-              <input
-                type="text"
-                value={githubUrl}
-                placeholder={DEFAULT_GITHUB_URL}
-                onChange={handleGithubUrlChange}
-                className="w-full rounded-md border border-gray-400 p-2 text-gray-700 focus:border-gray-500 focus:bg-white focus:outline-none"
-              />
-            </div>
-
             <Button
               disabled={
-                !githubUrl ||
-                isUploading ||
-                !cookieValue.openaiApiKey ||
-                !cookieValue.pineconeEnvironment ||
-                !cookieValue.pineconeIndex ||
-                !cookieValue.pineconeApiKey
+                !selectedDocuments.length ||
+                !cookieValue.openaiApiKey
               }
-              onClick={handleGithubUpload}
-              className="mt-2"
+              className="mr-2"
+              onClick={handleVectorize}
             >
-              {!isUploading ? (
-                <UploadCloud className="mr-2 h-4 w-4" />
-              ) : (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
-              Upload
+              <CheckCircle className="mr-2 h-4 w-4" />
+              Vectorize
             </Button>
           </div>
 
           <div>
-            This app needs you to{" "}
+            Je potřeba vložit {" "}
             <Link
               className="cursor-pointer text-blue-500 hover:text-blue-700 hover:underline"
               href="/credentials"
               rel="noreferrer"
             >
-              add credentials
+              API klíče
             </Link>{" "}
-            to work properly.
+            aby aplikace fungovala správně.
           </div>
         </div>
 
         <div className="flex grow flex-col items-start gap-2">
           <h2 className="mt-10 scroll-m-20 pb-2 text-2xl font-semibold tracking-tight transition-colors first:mt-0">
-            Ask me anything about the book
+            Zeptejte se na otázku ohledně dokumentů.
           </h2>
 
           <div className="w-full">
-            <div className="scrollbar-thumb-blue scrollbar-thumb-rounded scrollbar-track-blue-lighter scrollbar-w-2 scrolling-touch flex min-h-[300px] flex-col space-y-4 overflow-y-auto rounded border border-gray-400 p-4">
+            <div
+              ref={chatContainerRef}
+              className="scrollbar-thumb-blue scrollbar-thumb-rounded
+              scrollbar-track-blue-lighter scrollbar-w-2 scrolling-touch flex min-h-[300px]
+              max-h-[300px] flex-col space-y-4 overflow-y-auto rounded border border-gray-400 p-4">
               {[INITIAL_MESSAGE, ...chatHistory].map((chat, index) => {
                 return (
                   <div className="chat-message" key={index}>
@@ -348,10 +284,7 @@ export default function IndexPage() {
                   <Button
                     disabled={
                       isAsking ||
-                      !cookieValue.openaiApiKey ||
-                      !cookieValue.pineconeApiKey ||
-                      !cookieValue.pineconeEnvironment ||
-                      !cookieValue.pineconeIndex
+                      !cookieValue.openaiApiKey
                     }
                     onClick={handleSubmit}
                   >

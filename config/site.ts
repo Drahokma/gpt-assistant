@@ -11,12 +11,16 @@ interface SiteConfig {
 }
 
 export const siteConfig: SiteConfig = {
-  name: "BookGPT",
-  description: "Upload a book, start asking question",
+  name: "HCI GPT assistant",
+  description: "Upload a file, start asking question",
   mainNav: [
     {
       title: "Home",
       href: "/",
+    },
+    {
+      title: "Documents",
+      href: "/documents",
     },
     {
       title: "Credentials",
