@@ -87,19 +87,19 @@ export default async function handler(
 
     console.log("Vector store completed");
 
-    const questionGeneratorTemplate = `Máš dánu následující konverzací a následující otázku, přeformulujte následující otázku tak, aby byla samostatnou otázkou.
+    const questionGeneratorTemplate = `Máš dánu následující konverzaci a následující otázku, přeformuluj následující otázku tak, aby byla samostatnou otázkou.
 
     Historie chatu:
     {chat_history}
     Následující otázka: {question}
     Samostatná otázka:`;
 
-    const qaTemplate = `Použijte následující části kontextu k zodpovězení otázky na konci. Pokud neznáte odpověď, řekněte, že to nevíte, nevymýšlejte si odpověď.
+    const qaTemplate = `Použij následující části kontextu k zodpovězení otázky. Pokud neznáš odpověď, řekni že odpověď neznáš, nevymýšlej si odpověď.
 
     {context}
 
     Otázka: {question}
-    Nápomocná odpověď:`;
+    Výsledná odpověď založená na kontextu:`;
     // Create the chain
     const chain = ConversationalRetrievalQAChain.fromLLM(
       model,

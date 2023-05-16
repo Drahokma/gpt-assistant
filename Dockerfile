@@ -10,8 +10,8 @@ COPY package-lock.json ./
 
 RUN npm cache clean --force
 
-#run without new langchain
-#RUN npm install
+# Install dependencies using package-lock.json
+RUN npm install
 
 # Copy app source
 COPY . .

@@ -27,6 +27,8 @@ export async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   const { db } = await connectToDatabase('Documents');
 
+  console.log("connection succesfull ingest:")
+
   // Create a GridFS bucket
   const bucket = new GridFSBucket(db, {
     bucketName: "documents",
@@ -37,18 +39,19 @@ export async function handler(req: NextApiRequest, res: NextApiResponse) {
     await Promise.all(
       Object.values(files).map(async (fileObj: formidable.file) => {
         const fileData = endBuffers[fileObj.newFilename];
-        console.log(fileObj.newFilename)
+        console.log(fileData)
         const uploadStream = bucket.openUploadStream(fileObj.originalFilename, {
           contentType: fileObj.mimetype,
           metadata: {
             uploadDate: new Date(),
           },
         });
-
+        console.log("upload stream created")
         // Write the file data to the GridFS bucket
         await new Promise((resolve, reject) => {
           uploadStream.end(fileData, (error, result) => {
             if (error) {
+              console.error('Error in uploadStream.end:', error);
               reject(error);
             } else {
               resolve(result);

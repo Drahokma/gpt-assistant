@@ -1,10 +1,10 @@
-import { MongoClient } from "mongodb"
+import { MongoClient, MongoClientOptions } from "mongodb"
 
 const uri = process.env.MONGODB_URI
-const options = {
-  useUnifiedTopology: true,
-  useNewUrlParser: true,
-}
+// const options: MongoClientOptions = {
+//   useUnifiedTopology: true,
+//   useNewUrlParser: true,
+// }
 
 let client
 let clientPromise
@@ -15,13 +15,13 @@ if (!process.env.MONGODB_URI) {
 
 if (process.env.NODE_ENV === "development") {
   if (!client) {
-    client = new MongoClient(uri, options)
+    client = new MongoClient(uri)
     client.connect()
   }
   clientPromise = client
 } else {
   if (!clientPromise) {
-    clientPromise = MongoClient.connect(uri, options)
+    clientPromise = MongoClient.connect(uri)
   }
 }
 
@@ -29,6 +29,6 @@ export async function connectToDatabase(databaseName) {
   const connection = await clientPromise
   const db = connection.db(databaseName)
 
-  console.log("connection succesfull:", uri);
+  console.log("connection succesfull here:", uri);
   return { db, connection }
 }
