@@ -7,8 +7,10 @@ services:
       - '3000:3000'
     depends_on:
       - mongo
+      - redis
     environment:
       - MONGODB_URI=mongodb://mongo:27017/nextjs-db
+      - REDIS_URL=redis://redis:6379
     volumes:
       - .:/app
       - /app/node_modules
@@ -28,5 +30,12 @@ services:
     environment:
       - ME_CONFIG_MONGODB_SERVER=mongo
       - ME_CONFIG_MONGODB_PORT=27017
+
+  redis:
+    image: redis:6.2
+    container_name: redis
+    ports:
+      - '6379:6379'
+
 volumes:
   mongo-data:

@@ -192,29 +192,17 @@ export default function IndexPage() {
               onClick={handleSelectAll}>
               {selectAll ? "Deselect All" : "Select All"}
             </Button>
-            <Button
-              disabled={
-                !selectedDocuments.length ||
-                !cookieValue.openaiApiKey
-              }
-              className="mr-2"
-              onClick={handleVectorize}
-            >
-              <CheckCircle className="mr-2 h-4 w-4" />
-              Vectorize
-            </Button>
-          </div>
-
-          <div>
-            Je potřeba vložit {" "}
-            <Link
-              className="cursor-pointer text-blue-500 hover:text-blue-700 hover:underline"
-              href="/credentials"
-              rel="noreferrer"
-            >
-              API klíče
-            </Link>{" "}
-            aby aplikace fungovala správně.
+            {/*<Button*/}
+            {/*  disabled={*/}
+            {/*    !selectedDocuments.length ||*/}
+            {/*    !cookieValue.openaiApiKey*/}
+            {/*  }*/}
+            {/*  className="mr-2"*/}
+            {/*  onClick={handleVectorize}*/}
+            {/*>*/}
+            {/*  <CheckCircle className="mr-2 h-4 w-4" />*/}
+            {/*  Vectorize*/}
+            {/*</Button>*/}
           </div>
         </div>
 
@@ -283,8 +271,7 @@ export default function IndexPage() {
                 <div className="items-center sm:flex">
                   <Button
                     disabled={
-                      isAsking ||
-                      !cookieValue.openaiApiKey
+                      isAsking
                     }
                     onClick={handleSubmit}
                   >

@@ -193,8 +193,7 @@ const DocumentsPage = () => {
               <Button
                 disabled={
                   !files ||
-                  isUploading ||
-                  !cookieValue.openaiApiKey
+                  isUploading
                 }
                 className="mt-2"
                 onClick={handleUpload}
@@ -245,11 +244,7 @@ const DocumentsPage = () => {
             <Button
               disabled={
                 !githubUrl ||
-                isUploading ||
-                !cookieValue.openaiApiKey ||
-                !cookieValue.pineconeEnvironment ||
-                !cookieValue.pineconeIndex ||
-                !cookieValue.pineconeApiKey
+                isUploading
               }
               onClick={handleGithubUpload}
               className="mt-2"

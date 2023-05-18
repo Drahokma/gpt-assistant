@@ -65,26 +65,31 @@ export default async function handler(
     // Combine the content of all selected documents into a single string
 
     const text = documentsContent.join("\n");
-    console.log("text", text);
 
     // Initialize the LLM to use to answer the question
-    const model = new OpenAI({ temperature: 0 });
+    const model = new OpenAI({ temperature: 0,  });
     const prompt = PromptTemplate.fromTemplate(
       "Odpověz na zadanou otázku?"
     );
-    const chainA = new LLMChain({ llm: model, prompt });
 
     // Split the text into chunks
-    const textSplitter = new RecursiveCharacterTextSplitter({ chunkSize: 1000 });
+    const textSplitter = new RecursiveCharacterTextSplitter({ chunkSize: 300 });
     const docs = await textSplitter.createDocuments([text]);
-
+    console.log("docstore splitted", docs);
+    console.log("embeddings started", process.env.AZURE_OPENAI_API_DEPLOYMENT_NAME, process.env.AZURE_OPENAI_API_EMBEDDINGS_DEPLOYMENT_NAME,
+      process.env.AZURE_OPENAI_API_EMBEDDINGS_INSTANCE_NAME, process.env.AZURE_OPENAI_API_EMBEDDINGS_VERSION);
     // Create the vector store
-    const vectorStore = await MemoryVectorStore.fromDocuments(docs,
-      new OpenAIEmbeddings({
-        openAIApiKey: credentials.openaiApiKey
-      })
-    );
+    const embeddings = new OpenAIEmbeddings({
+      azureOpenAIApiKey: process.env.AZURE_OPENAI_API_KEY, // In Node.js defaults to process.env.AZURE_OPENAI_API_KEY
+      azureOpenAIApiInstanceName: process.env.AZURE_OPENAI_API_INSTANCE_NAME, // In Node.js defaults to process.env.AZURE_OPENAI_API_INSTANCE_NAME
+      azureOpenAIApiDeploymentName: "hci-embedings", // In Node.js defaults to process.env.AZURE_OPENAI_API_DEPLOYMENT_NAME
+      azureOpenAIApiVersion: "2022-12-01", // In Node.js defaults to process.env.AZURE_OPENAI_API_VERSION
+    });
 
+    const vectorStore = await MemoryVectorStore.fromDocuments(
+      docs,
+      new OpenAIEmbeddings({batchSize: 1})
+    );
     console.log("Vector store completed");
 
     const questionGeneratorTemplate = `Máš dánu následující konverzaci a následující otázku, přeformuluj následující otázku tak, aby byla samostatnou otázkou.
@@ -111,14 +116,16 @@ export default async function handler(
       }
     );
     console.log("chain completed");
+    console.log("openai credentials", process.env.AZURE_OPENAI_API_DEPLOYMENT_NAME, process.env.AZURE_OPENAI_API_KEY);
     // Ask the question
     const response = await chain.call({
       question: question,
       chat_history: chatHistory || [],
     });
-
+    console.log("response completed", response);
     res.status(200).json(response);
   } catch (e) {
+    console.log("error", e);
     res.status(500).json({ error: e.message || "Unknown error." });
   }
 }
