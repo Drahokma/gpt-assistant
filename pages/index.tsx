@@ -57,6 +57,7 @@ export default function IndexPage() {
     } else {
       setSelectedDocuments([...selectedDocuments, document])
     }
+    console.log(selectedDocuments)
   }
 
   const handleQueryChange = (e) => {

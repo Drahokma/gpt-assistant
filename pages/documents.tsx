@@ -227,36 +227,6 @@ const DocumentsPage = () => {
                 ))}
             </ul>
           </div>
-          <div className="w-full mt-6 md:w-1/2 md:mt-0">
-            <h2 className="text-2xl font-semibold tracking-tight">
-              Upload GitHub Pages
-            </h2>
-            <div className="my-2 w-full">
-              <input
-                type="text"
-                value={githubUrl}
-                placeholder={DEFAULT_GITHUB_URL}
-                onChange={handleGithubUrlChange}
-                className="w-full rounded-md border border-gray-400 p-2 text-gray-700 focus:border-gray-500 focus:bg-white focus:outline-none"
-              />
-            </div>
-
-            <Button
-              disabled={
-                !githubUrl ||
-                isUploading
-              }
-              onClick={handleGithubUpload}
-              className="mt-2"
-            >
-              {!isUploading ? (
-                <UploadCloud className="mr-2 h-4 w-4" />
-              ) : (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
-              Upload
-            </Button>
-          </div>
         </div>
       </section>
     </Layout>

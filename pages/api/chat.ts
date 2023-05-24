@@ -9,6 +9,9 @@ import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { connectToDatabase } from "@/lib/mongodb";
 import { GridFSBucket } from "mongodb";
 import pdfParse from "pdf-parse";
+import { Document } from "langchain/document";
+import { RedisVectorStore } from "langchain/vectorstores/redis";
+import { createClient } from "redis";
 
 export async function getFileContentFromMongoDB(db, filename: string): Promise<string> {
   const bucket = new GridFSBucket(db, {
@@ -54,44 +57,16 @@ export default async function handler(
   }
 
   try {
-    // Connect to the database
-    const { db } = await connectToDatabase('Documents');
-
-    // Read the content of the selected documents from MongoDB
-    const documentsContent = await Promise.all(
-      selectedDocuments.map((doc) => getFileContentFromMongoDB(db, doc.filename))
-    );
-
-    // Combine the content of all selected documents into a single string
-
-    const text = documentsContent.join("\n");
-
-    // Initialize the LLM to use to answer the question
-    const model = new OpenAI({ temperature: 0,  });
-    const prompt = PromptTemplate.fromTemplate(
-      "Odpověz na zadanou otázku?"
-    );
-
-    // Split the text into chunks
-    const textSplitter = new RecursiveCharacterTextSplitter({ chunkSize: 300 });
-    const docs = await textSplitter.createDocuments([text]);
-    console.log("docstore splitted", docs);
-    console.log("embeddings started", process.env.AZURE_OPENAI_API_DEPLOYMENT_NAME, process.env.AZURE_OPENAI_API_EMBEDDINGS_DEPLOYMENT_NAME,
-      process.env.AZURE_OPENAI_API_EMBEDDINGS_INSTANCE_NAME, process.env.AZURE_OPENAI_API_EMBEDDINGS_VERSION);
-    // Create the vector store
-    const embeddings = new OpenAIEmbeddings({
-      azureOpenAIApiKey: process.env.AZURE_OPENAI_API_KEY, // In Node.js defaults to process.env.AZURE_OPENAI_API_KEY
-      azureOpenAIApiInstanceName: process.env.AZURE_OPENAI_API_INSTANCE_NAME, // In Node.js defaults to process.env.AZURE_OPENAI_API_INSTANCE_NAME
-      azureOpenAIApiDeploymentName: "hci-embedings", // In Node.js defaults to process.env.AZURE_OPENAI_API_DEPLOYMENT_NAME
-      azureOpenAIApiVersion: "2022-12-01", // In Node.js defaults to process.env.AZURE_OPENAI_API_VERSION
+     const client = createClient({
+      url: process.env.REDIS_URL ?? "redis://localhost:6379",
+    });
+    await client.connect();
+    const vectorStore = new RedisVectorStore(new OpenAIEmbeddings(), {
+      redisClient: client,
+      indexName: "docs",
     });
 
-    const vectorStore = await MemoryVectorStore.fromDocuments(
-      docs,
-      new OpenAIEmbeddings({batchSize: 1})
-    );
-    console.log("Vector store completed");
-
+    const model = new OpenAI({temperature: 0, maxTokens: -1});
     const questionGeneratorTemplate = `Máš dánu následující konverzaci a následující otázku, přeformuluj následující otázku tak, aby byla samostatnou otázkou.
 
     Historie chatu:
@@ -105,27 +80,27 @@ export default async function handler(
 
     Otázka: {question}
     Výsledná odpověď založená na kontextu:`;
+
+    const filenames = selectedDocuments.map(doc => doc.filename);
     // Create the chain
     const chain = ConversationalRetrievalQAChain.fromLLM(
       model,
-      vectorStore.asRetriever(),
+      vectorStore.asRetriever(1, filenames),
       {
         questionGeneratorTemplate,
         qaTemplate,
         returnSourceDocuments: true,
       }
     );
-    console.log("chain completed");
-    console.log("openai credentials", process.env.AZURE_OPENAI_API_DEPLOYMENT_NAME, process.env.AZURE_OPENAI_API_KEY);
     // Ask the question
     const response = await chain.call({
       question: question,
       chat_history: chatHistory || [],
     });
-    console.log("response completed", response);
+    console.log(response)
+    await client.disconnect();
     res.status(200).json(response);
   } catch (e) {
-    console.log("error", e);
     res.status(500).json({ error: e.message || "Unknown error." });
   }
 }

@@ -28,7 +28,5 @@ if (process.env.NODE_ENV === "development") {
 export async function connectToDatabase(databaseName) {
   const connection = await clientPromise
   const db = connection.db(databaseName)
-
-  console.log("connection succesfull here:", uri);
   return { db, connection }
 }
