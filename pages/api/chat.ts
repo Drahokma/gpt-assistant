@@ -66,7 +66,7 @@ export default async function handler(
       indexName: "docs",
     });
 
-    const model = new OpenAI({temperature: 0, maxTokens: -1});
+    const model = new OpenAI({temperature: 0, maxTokens: 1000});
     const questionGeneratorTemplate = `Máš dánu následující konverzaci a následující otázku, přeformuluj následující otázku tak, aby byla samostatnou otázkou.
 
     Historie chatu:
@@ -93,6 +93,7 @@ export default async function handler(
       }
     );
     // Ask the question
+    console.log('chain completed')
     const response = await chain.call({
       question: question,
       chat_history: chatHistory || [],
