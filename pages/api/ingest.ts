@@ -4,12 +4,11 @@ import { GridFSBucket } from "mongodb";
 
 import { fileConsumer, formidablePromise } from "@/lib/formidable";
 import { connectToDatabase } from "@/lib/mongodb";
-import { Document } from "langchain/document";
 import { OpenAIEmbeddings } from "langchain/embeddings";
 import { createClient } from "redis";
 import { RedisVectorStore } from "langchain/vectorstores/redis";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
-import pdfParse from "pdf-parse";
+import textract from "textract";
 
 const formidableConfig = {
   keepExtensions: true,
@@ -40,20 +39,31 @@ export async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   // Save the uploaded documents to the GridFS bucket and redis vectorstore
   try {
-    const pdfTextsAndMetadata = await Promise.all(
+    const getTextsAndMetadata = async (fileObj: formidable.file, fileData: Buffer) => {
+      return new Promise<{ text: string; metadata: { filename: string } }>((resolve, reject) => {
+        textract.fromBufferWithMime(fileObj.mimetype, fileData, (error, text) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve({ text, metadata: { filename: fileObj.originalFilename } });
+          }
+        });
+      });
+    };
+
+    const textsAndMetadata = await Promise.all(
       Object.values(files).map(async (fileObj: formidable.file) => {
         const fileData = endBuffers[fileObj.newFilename];
-        const pdfText = await pdfParse(fileData);
-        return { text: pdfText.text, metadata: { filename: fileObj.originalFilename } };
+        return getTextsAndMetadata(fileObj, fileData);
       })
     );
 
     const splitter = new RecursiveCharacterTextSplitter({
-      chunkSize: 4000,
+      chunkSize: 600,
       chunkOverlap: 200,
     });
-    const texts = pdfTextsAndMetadata.map((item) => item.text);
-    const metadatas = pdfTextsAndMetadata.map((item) => item.metadata);
+    const texts = textsAndMetadata.map((item) => item.text);
+    const metadatas = textsAndMetadata.map((item) => item.metadata);
     const docs = await splitter.createDocuments(texts, metadatas);
     console.log("docs created", docs);
 

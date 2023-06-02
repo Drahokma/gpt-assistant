@@ -120,6 +120,8 @@ const DocumentsPage = () => {
     accept: {
       "application/pdf": [".pdf"],
       "text/plain": [".txt", ".md"],
+      "application/msword": [".doc"],
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
     },
   });
 

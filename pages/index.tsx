@@ -10,11 +10,11 @@ import { cn } from "@/lib/utils"
 import { Layout } from "@/components/layout"
 import { Button } from "@/components/ui/button"
 
-const DEFAULT_QUESTION = "O čem jsou následující soubory?"
+const DEFAULT_QUESTION = ""
 const INITIAL_MESSAGE = {
   from: "bot",
   content:
-    "Můžete mě považovat za svou znalostní základnu, jakmile nahrajete soubor, znalosti budou uloženy v databázi. Můžete se kdykoli vrátit a pokládat otázky o nich napříč více soubory.",
+    "You can consider me as your knowledge base, ask about the files stored in the database. You can come back anytime and ask questions about them across multiple files.",
 }
 
 export default function IndexPage() {
@@ -92,12 +92,12 @@ export default function IndexPage() {
     })
     const answer = await response.json()
 
-    if (answer.text) {
+    if (answer.output) {
       setChatHistory((currentChatHistory) => [
         ...currentChatHistory,
         {
           from: "bot",
-          content: answer.text,
+          content: answer.output,
         },
       ])
 

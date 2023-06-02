@@ -1,45 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { OpenAI } from "langchain/llms";
-import { PromptTemplate} from "langchain";
-import { LLMChain} from "langchain";
-import { ConversationalRetrievalQAChain } from "langchain/chains";
-import { MemoryVectorStore } from "langchain/vectorstores/memory";
 import { OpenAIEmbeddings } from "langchain/embeddings";
-import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
-import { connectToDatabase } from "@/lib/mongodb";
-import { GridFSBucket } from "mongodb";
-import pdfParse from "pdf-parse";
-import { Document } from "langchain/document";
 import { RedisVectorStore } from "langchain/vectorstores/redis";
 import { createClient } from "redis";
+import { ConversationalRetrievalQAChain} from "langchain/chains";
+import {ChatOpenAI} from "langchain/chat_models/openai";
+import { convAgent} from "@/lib/agent-hci";
 
-export async function getFileContentFromMongoDB(db, filename: string): Promise<string> {
-  const bucket = new GridFSBucket(db, {
-    bucketName: "documents",
-  });
-
-  const readStream = bucket.openDownloadStreamByName(filename);
-  let data = [];
-
-  return new Promise((resolve, reject) => {
-    readStream
-      .on("data", (chunk) => {
-        data.push(chunk);
-      })
-      .on("error", (error) => {
-        reject(error);
-      })
-      .on("end", async () => {
-        const buffer = Buffer.concat(data);
-        try {
-          const pdfData = await pdfParse(buffer);
-          resolve(pdfData.text);
-        } catch (error) {
-          reject(error);
-        }
-      });
-  });
-}
 
 export default async function handler(
   req: NextApiRequest,
@@ -60,13 +26,18 @@ export default async function handler(
      const client = createClient({
       url: process.env.REDIS_URL ?? "redis://localhost:6379",
     });
+
     await client.connect();
     const vectorStore = new RedisVectorStore(new OpenAIEmbeddings(), {
       redisClient: client,
       indexName: "docs",
     });
 
-    const model = new OpenAI({temperature: 0, maxTokens: 1000});
+    const model = new ChatOpenAI({
+      temperature: 0,
+      azureOpenAIApiDeploymentName: "gpt3-hci"
+    });
+
     const questionGeneratorTemplate = `Máš dánu následující konverzaci a následující otázku, přeformuluj následující otázku tak, aby byla samostatnou otázkou.
 
     Historie chatu:
@@ -93,15 +64,22 @@ export default async function handler(
       }
     );
     // Ask the question
-    console.log('chain completed')
     const response = await chain.call({
       question: question,
       chat_history: chatHistory || [],
     });
     console.log(response)
+    //);
+
+    const input = question;
+    const createdAgenOne = await convAgent(client);
+    const resultAgentOne = await createdAgenOne.call({input});
     await client.disconnect();
-    res.status(200).json(response);
+    console.log("agent response:", resultAgentOne)
+    console.log("agent response:", resultAgentOne.output)
+    res.status(200).json(resultAgentOne);
   } catch (e) {
+    console.log(e)
     res.status(500).json({ error: e.message || "Unknown error." });
   }
 }
